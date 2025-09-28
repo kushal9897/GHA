@@ -85,7 +85,7 @@ jobs:
           echo "Branch: ${{ env.BRANCH_NAME }}"
           echo "Version: ${{ env.NEXT_TAG }}"
           ./scripts/build-docker-image.sh uat ${{ env.BRANCH_NAME }}
-
+## comment this step before push to test only
       - name: Push UAT Docker Image
         run: |
           echo " Building UAT Docker image..."
@@ -102,7 +102,7 @@ jobs:
           echo "Branch: ${{ env.BRANCH_NAME }}"
           echo "Version: ${{ env.NEXT_TAG }}"
           ./scripts/build-docker-image.sh prod ${{ env.BRANCH_NAME }}
-
+## comment this step before push to test only
       - name: Push PROD Docker Image
         if: env.BRANCH_NAME == 'main'
         run: |
@@ -140,7 +140,7 @@ jobs:
           echo "NOTES_FILE=$notes_file" >> $GITHUB_ENV
           echo "PR_TITLE=$pr_title" >> $GITHUB_ENV
           echo "PR_URL=$pr_url" >> $GITHUB_ENV
-
+## comment this step before push to test only
       - name: create release 
         id: release
         env:
@@ -155,7 +155,7 @@ jobs:
           else
             echo "release_created=false" >> $GITHUB_OUTPUT
           fi
-
+## comment this step before push to test only
       - name: Slack Notification
         if: always()
         uses: rtCamp/action-slack-notify@v2
@@ -176,6 +176,7 @@ jobs:
             *PR Title:* ${{ env.PR_TITLE }}
           SLACK_FOOTER: 'GitHub Actions | ${{ github.repository }}'
           MSG_MINIMAL: false
+
 
 
 
