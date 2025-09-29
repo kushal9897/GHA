@@ -1,0 +1,26 @@
+FROM ghcr.io/fintromers/base-go:latest AS builder
+
+WORKDIR /app
+
+ENV GOFLAGS="-p=1"
+
+ARG DD_GIT_REPOSITORY_URL
+ARG DD_GIT_COMMIT_SHA
+ENV DD_GIT_REPOSITORY_URL="${DD_GIT_REPOSITORY_URL}"
+ENV DD_GIT_COMMIT_SHA="${DD_GIT_COMMIT_SHA}"
+
+COPY . ./
+RUN go mod tidy
+# GOMAXPROCS to control memory use during compilation
+# GOGC=off to control CPU use during compilation
+# Jenkins build agents have limited CPU and memory use
+RUN GOOS=linux GOARCH=amd64 GOMEMLIMIT=12GiB GOMAXPROCS=2 go build --tags=PROD -p=1 -o build/ftron cmd/ftron/main.go
+
+FROM --platform=linux/amd64 alpine:3
+
+WORKDIR /app
+
+RUN apk update && apk add --no-cache tzdata
+COPY --from=builder /app/build/ftron .
+
+CMD ["./build/ftron/ftron"]
