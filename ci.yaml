@@ -6,178 +6,102 @@ on:
       - main
 
 permissions:
-  contents: write       # For creating releases
-  packages: write       # For pushing to GHCR
-  pull-requests: read   # If needed for future
+  contents: write
+  packages: write
+  pull-requests: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  docker:
+  build-and-release:
     runs-on: [ docker ]
-
-    env:
-      DOCKER_REPO: ghcr.io/fintronners
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
     steps:
-      
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  
-      
+          fetch-depth: 0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Set branch name
-        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
-      
-      - name: Make scripts executable
-        run: chmod +x scripts/*.sh
 
-      - name: Get next version tag
-        run: |
-          echo "Fetching latest release tag..."
-          
-          latest_tag=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
-          
-          # If no release found, try git tags
-          if [ -z "$latest_tag" ]; then
-            echo "No releases found, checking git tags..."
-            latest_tag=$(git tag --sort=-version:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo '')
-          fi
-          
-          # Remove 'v' prefix if present
-          version=${latest_tag#v}
-          
-          # Parse version numbers
-          IFS='.' read -r major minor build <<< "$version"
-          
-          # Increment build number
-          next_build=$((build + 1))
-          next_tag="${major}.${minor}.${next_build}"
-          
-          echo "Latest tag: $latest_tag"
-          echo "Next tag: $next_tag"
-          
-          # Export for later steps
-          echo "NEXT_TAG=$next_tag" >> $GITHUB_ENV
-          echo "NEXT_TAG_VERSION=${next_tag}" >> $GITHUB_ENV
-
-      - name: Create version properties
-        run: |
-          echo "version=${{ env.NEXT_TAG }}" > version.properties
-          echo "latest=latest" >> version.properties
-          echo "created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> version.properties
-          echo " Created version.properties file"
-          cat version.properties
-
-      - name: Build UAT Docker Image
-        run: |
-          echo " Building UAT Docker image..."
-          echo "Environment: uat"
-          echo "Branch: ${{ env.BRANCH_NAME }}"
-          echo "Version: ${{ env.NEXT_TAG }}"
-          ./scripts/build-docker-image.sh uat ${{ env.BRANCH_NAME }}
-## comment this step before push to test only
-      - name: Push UAT Docker Image
-        run: |
-          echo " Building UAT Docker image..."
-          echo "Environment: uat"
-          echo "Branch: ${{ env.BRANCH_NAME }}"
-          echo "Version: ${{ env.NEXT_TAG }}"
-          ./scripts/push-docker-image.sh uat ${{ env.BRANCH_NAME }}
-
-      - name: Build PROD Docker Image
-        if: env.BRANCH_NAME == 'main'
-        run: |
-          echo " Building PROD Docker image..."
-          echo "Environment: prod"
-          echo "Branch: ${{ env.BRANCH_NAME }}"
-          echo "Version: ${{ env.NEXT_TAG }}"
-          ./scripts/build-docker-image.sh prod ${{ env.BRANCH_NAME }}
-## comment this step before push to test only
-      - name: Push PROD Docker Image
-        if: env.BRANCH_NAME == 'main'
-        run: |
-          echo " Building PROD Docker image..."
-          echo "Environment: prod"
-          echo "Branch: ${{ env.BRANCH_NAME }}"
-          echo "Version: ${{ env.NEXT_TAG }}"
-          ./scripts/push-docker-image.sh prod ${{ env.BRANCH_NAME }}
-
-      - name: Preview Release Notes (no release creation)
-        run: |
-          pr_number=$(git log -1 --pretty=%s | sed -n 's/.*#\([0-9]\+\).*/\1/p')
-          if [ -z "$pr_number" ]; then
-            echo "No PR number found in commit message."
-            exit 0
-          fi
-
-          echo "Found PR: #$pr_number"
-
-          pr_title=$(gh pr view $pr_number --json title -q .title)
-          pr_body=$(gh pr view $pr_number --json body -q .body)
-          pr_url=$(gh pr view $pr_number --json url -q .url)
-
-          notes_file=$(mktemp)
-          {
-            echo "# $pr_title"
-            echo
-            echo "Linked PR: $pr_url"
-            echo
-            echo "$pr_body"
-          } > "$notes_file"
-
-          cat "$notes_file"
-
-          echo "NOTES_FILE=$notes_file" >> $GITHUB_ENV
-          echo "PR_TITLE=$pr_title" >> $GITHUB_ENV
-          echo "PR_URL=$pr_url" >> $GITHUB_ENV
-## comment this step before push to test only
-      - name: create release 
-        id: release
+      - name: Compute next version
+        id: ver
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release create "${{ env.NEXT_TAG }}" \
-             --title "Release ${{ env.NEXT_TAG }}" \
-             --notes-file "${{ env.NOTES_FILE }}" \
-             --target main \
-             --latest; then
-            echo "release_created=true" >> $GITHUB_OUTPUT
-          else
-            echo "release_created=false" >> $GITHUB_OUTPUT
+          latest_tag=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          if [ -z "$latest_tag" ]; then
+            latest_tag=$(git tag --sort=-version:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo "0.0.0")
           fi
-## comment this step before push to test only
+          version=${latest_tag#v}
+          IFS='.' read -r major minor build <<< "$version"
+          next_build=$((build + 1))
+          NEXT_TAG="${major}.${minor}.${next_build}"
+          echo "NEXT_TAG=${NEXT_TAG}" >> "$GITHUB_OUTPUT"
+          
+          # Create version.properties
+          echo "version=${NEXT_TAG}" > version.properties
+          echo "latest=latest" >> version.properties
+          echo "created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> version.properties
+
+      - name: Build UAT Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/compile/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/fintronners/ftron:${{ steps.ver.outputs.NEXT_TAG }}-uat
+            ghcr.io/fintronners/ftron:${{ steps.ver.outputs.NEXT_TAG }}-uat-latest
+          platforms: linux/amd64
+          provenance: false
+          cache-from: type=gha,scope=ftron
+          cache-to: type=gha,scope=ftron,mode=max
+
+      - name: Build PROD Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/prod/compile/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/fintronners/ftron:${{ steps.ver.outputs.NEXT_TAG }}-prod
+            ghcr.io/fintronners/ftron:${{ steps.ver.outputs.NEXT_TAG }}-prod-latest
+          platforms: linux/amd64
+          provenance: false
+          cache-from: type=gha,scope=ftron
+          cache-to: type=gha,scope=ftron,mode=max
+          build-args: |
+            DD_GIT_REPOSITORY_URL=https://github.com/${{ github.repository }}
+            DD_GIT_COMMIT_SHA=${{ github.sha }}
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.ver.outputs.NEXT_TAG }}" \
+            --title "Release ${{ steps.ver.outputs.NEXT_TAG }}" \
+            --notes "Automated release for ${{ steps.ver.outputs.NEXT_TAG }}" \
+            --target main \
+            --latest
+
       - name: Slack Notification
         if: always()
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CHANNEL: "fintron-eng-back-end"
-          SLACK_ICON: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
-          SLACK_COLOR: ${{ job.status }}  
+          SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: 'Docker Build and Release'
           SLACK_MESSAGE: |
-            *Workflow:* ${{ github.workflow }}
-            *Branch:* ${{ env.BRANCH_NAME }}
-            *Version:* ${{ env.NEXT_TAG }}
-            *Author:* ${{ github.actor }}
+            *Version:* ${{ steps.ver.outputs.NEXT_TAG }}
             *Status:* ${{ job.status }}
-            *Release Created:* ${{ steps.release.outputs.release_created || 'false' }}
-            *PR Link:* ${{ env.PR_URL }}
-            *PR Title:* ${{ env.PR_TITLE }}
-          SLACK_FOOTER: 'GitHub Actions | ${{ github.repository }}'
-          MSG_MINIMAL: false
-
-
-
-
-
