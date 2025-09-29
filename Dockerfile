@@ -1,20 +1,40 @@
+# syntax=docker/dockerfile:1.7
+
+# Stage 1: Download dependencies
+FROM ghcr.io/fintronners/base-go:latest AS deps
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Stage 2: Build binary
 FROM ghcr.io/fintronners/base-go:latest AS builder
+WORKDIR /src
 
+# Copy dependencies from previous stage
+COPY --from=deps /go/pkg/mod /go/pkg/mod
+
+# Copy source code
+COPY . .
+
+# Build with cache mounts (removed conservative flags for speed)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build --tags=UAT -trimpath -ldflags="-s -w" \
+    -o /out/ftron cmd/ftron/main.go
+
+# Stage 3: Final minimal image
+FROM alpine:3.20
 WORKDIR /app
 
-copy . . /
+# Install only necessary packages (no cleanup needed with --no-cache)
+RUN apk add --no-cache tzdata ca-certificates
 
-RUN go mod tidy
-# GOMAXPROCS to control memory use during compilation
-# GOMEMLIMIT to control CPU use during compilation
-RUN GOOS=linux GOARCH=amd64 GOMEMLIMIT=12GiB GOMAXPROCS=2 go build --tags=UAT -o build/ftron/ftron cmd/ftron/main.go
+# Copy binary from builder
+COPY --from=builder /out/ftron /app/ftron
 
-FROM --platform=linux/amd64 alpine:3
+# Run as non-root user
+USER 65532:65532
 
-WORKDIR /app
-
-RUN apk update && apk add --no-cache tzdata
-
-COPY --from=builder /app/build/ftron .
-
-CMD ["./build/ftron/ftron"]
+ENTRYPOINT ["/app/ftron"]
