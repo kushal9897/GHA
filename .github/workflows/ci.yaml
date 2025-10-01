@@ -1,0 +1,23 @@
+name: Hello World Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  say-hello:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Print greeting
+        run: echo "Hello, GitHub Actions! 👋"
+      
+      - name: Show current date
+        run: date
+      
+      - name: Display system info
+        run: |
+          echo "Runner OS: $RUNNER_OS"
+          echo "Job status: ${{ job.status }}"
