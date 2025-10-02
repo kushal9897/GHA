@@ -1,0 +1,57 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowReadSinglePool",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:ListUsers",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:GetUser"
+      ],
+      "Resource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID"
+    },
+    {
+      "Sid": "AllowMinimalUnscopedRead",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:ListUsersInGroup",
+        "cognito-idp:ListGroups",
+        "cognito-idp:ListUserPools"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyOtherPools",
+      "Effect": "Deny",
+      "Action": "cognito-idp:*",
+      "NotResource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID"
+    },
+    {
+      "Sid": "DenyWritesOnTargetPool",
+      "Effect": "Deny",
+      "Action": [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:AdminAddUserToGroup",
+        "cognito-idp:AdminRemoveUserFromGroup",
+        "cognito-idp:AdminResetUserPassword",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:CreateUserPool"
+      ],
+      "Resource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID"
+    },
+    {
+      "Sid": "DenyAllOtherAWSServices",
+      "Effect": "Deny",
+      "NotAction": [
+        "cognito-idp:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
