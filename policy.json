@@ -1,57 +1,137 @@
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowReadSinglePool",
-      "Effect": "Allow",
-      "Action": [
-        "cognito-idp:ListUsers",
-        "cognito-idp:AdminGetUser",
-        "cognito-idp:DescribeUserPool",
-        "cognito-idp:GetUser"
-      ],
-      "Resource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID"
-    },
-    {
-      "Sid": "AllowMinimalUnscopedRead",
-      "Effect": "Allow",
-      "Action": [
-        "cognito-idp:ListUsersInGroup",
-        "cognito-idp:ListGroups",
-        "cognito-idp:ListUserPools"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "DenyOtherPools",
-      "Effect": "Deny",
-      "Action": "cognito-idp:*",
-      "NotResource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID"
-    },
-    {
-      "Sid": "DenyWritesOnTargetPool",
-      "Effect": "Deny",
-      "Action": [
-        "cognito-idp:AdminCreateUser",
-        "cognito-idp:AdminDeleteUser",
-        "cognito-idp:AdminUpdateUserAttributes",
-        "cognito-idp:AdminAddUserToGroup",
-        "cognito-idp:AdminRemoveUserFromGroup",
-        "cognito-idp:AdminResetUserPassword",
-        "cognito-idp:AdminSetUserPassword",
-        "cognito-idp:UpdateUserPool",
-        "cognito-idp:DeleteUserPool",
-        "cognito-idp:CreateUserPool"
-      ],
-      "Resource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID"
-    },
-    {
-      "Sid": "DenyAllOtherAWSServices",
-      "Effect": "Deny",
-      "NotAction": [
-        "cognito-idp:*"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "AllowPasswordChange",
+        "Effect": "Allow",
+        "Action": [
+          "iam:ChangePassword",
+          "iam:GetAccountPasswordPolicy",
+          "iam:GetUser"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "AllowCreateAndEnableMFAForSelf",
+        "Effect": "Allow",
+        "Action": [
+          "iam:CreateVirtualMFADevice",
+          "iam:EnableMFADevice",
+          "iam:ResyncMFADevice"
+        ],
+        "Resource": [
+          "arn:aws:iam::<ACCOUNT_ID>:mfa/${aws:username}",
+          "arn:aws:iam::<ACCOUNT_ID>:user/${aws:username}"
+        ]
+      },
+      {
+        "Sid": "ListMFADevicesForSelf",
+        "Effect": "Allow",
+        "Action": [
+          "iam:ListMFADevices",
+          "iam:ListVirtualMFADevices"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "PermitConsoleBasics",
+        "Effect": "Allow",
+        "Action": [
+          "sts:GetCallerIdentity",
+          "iam:ListAccountAliases"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "AllowReadOnlyOnSpecificUserPool",
+        "Effect": "Allow",
+        "Action": [
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:ListUsers",
+          "cognito-idp:ListUsersInGroup",
+          "cognito-idp:GetUser",
+          "cognito-idp:GetGroup",
+          "cognito-idp:ListGroups",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminListGroupsForUser",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListTagsForResource"
+        ],
+        "Resource": "arn:aws:cognito-idp:<REGION>:<ACCOUNT_ID>:userpool/<UAT_POOL_ID>"
+      },
+      {
+        "Sid": "AllowSafeNonResourceReads",
+        "Effect": "Allow",
+        "Action": [
+          "cognito-idp:DescribeUserPoolDomain",
+          "cognito-idp:ListIdentityProviders"
+        ],
+        "Resource": "*",
+        "Condition": {
+          "StringEquals": { "aws:RequestedRegion": "<REGION>" },
+          "Bool": { "aws:MultiFactorAuthPresent": "true" }
+        }
+      },
+      {
+        "Sid": "DenyListingUserPools",
+        "Effect": "Deny",
+        "Action": "cognito-idp:ListUserPools",
+        "Resource": "*"
+      },
+      {
+        "Sid": "DenyListingIdentityPools",
+        "Effect": "Deny",
+        "Action": "cognito-identity:ListIdentityPools",
+        "Resource": "*"
+      },
+      {
+        "Sid": "DenyAllCognitoWriteOperations",
+        "Effect": "Deny",
+        "Action": [
+          "cognito-idp:AdminAddUserToGroup",
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminDisableProviderForUser",
+          "cognito-idp:AdminDisableUser",
+          "cognito-idp:AdminEnableUser",
+          "cognito-idp:AdminForgetDevice",
+          "cognito-idp:AdminLinkProviderForUser",
+          "cognito-idp:AdminRemoveUserFromGroup",
+          "cognito-idp:AdminResetUserPassword",
+          "cognito-idp:AdminSetUserMFAPreference",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminSetUserSettings",
+          "cognito-idp:AdminUpdateAuthEventFeedback",
+          "cognito-idp:AdminUpdateDeviceStatus",
+          "cognito-idp:AdminUpdateUserAttributes",
+          "cognito-idp:ChangePassword",
+          "cognito-idp:ConfirmForgotPassword",
+          "cognito-idp:ConfirmSignUp",
+          "cognito-idp:Create*",
+          "cognito-idp:Delete*",
+          "cognito-idp:Update*",
+          "cognito-idp:Set*",
+          "cognito-idp:Add*",
+          "cognito-idp:Remove*",
+          "cognito-idp:TagResource",
+          "cognito-idp:UntagResource"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "DenyAllCognitoExceptUAT",
+        "Effect": "Deny",
+        "Action": "cognito-idp:*",
+        "NotResource": "arn:aws:cognito-idp:<REGION>:<ACCOUNT_ID>:userpool/<UAT_POOL_ID>"
+      },
+      {
+        "Sid": "RequireMFAForCognitoAccess",
+        "Effect": "Deny",
+        "Action": "cognito-idp:*",
+        "Resource": "arn:aws:cognito-idp:<REGION>:<ACCOUNT_ID>:userpool/<UAT_POOL_ID>",
+        "Condition": { "BoolIfExists": { "aws:MultiFactorAuthPresent": "false" } }
+      }
+    ]
+  }
+  
