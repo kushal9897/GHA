@@ -74,14 +74,10 @@
         }
       },
       {
-        "Sid": "AllowListUserPools",
-        "Effect": "Allow",
+        "Sid": "DenyListingUserPools",
+        "Effect": "Deny",
         "Action": "cognito-idp:ListUserPools",
-        "Resource": "*",
-        "Condition": {
-          "StringEquals": { "aws:RequestedRegion": "<REGION>" },
-          "Bool": { "aws:MultiFactorAuthPresent": "true" }
-        }
+        "Resource": "*"
       },
       {
         "Sid": "DenyListingIdentityPools",
@@ -126,11 +122,7 @@
       {
         "Sid": "DenyAllCognitoExceptUAT",
         "Effect": "Deny",
-        "NotAction": [
-          "cognito-idp:ListUserPools",
-          "cognito-idp:DescribeUserPoolDomain",
-          "cognito-idp:ListIdentityProviders"
-        ],
+        "Action": "cognito-idp:*",
         "NotResource": "arn:aws:cognito-idp:<REGION>:<ACCOUNT_ID>:userpool/<UAT_POOL_ID>"
       },
       {
